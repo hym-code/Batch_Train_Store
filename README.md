@@ -1,5 +1,5 @@
 Distributed Storage System Simulator Design Overview
-This system simulates a distributed storage environment with optimized space management and I/O operations. Key design elements combine efficiency-focused data structures with intelligent allocation strategies:
+This system simulates a distributed Batch-Train storage environment with optimized space management and I/O operations. Key design elements combine efficiency-focused data structures with intelligent allocation strategies:
 Core Architecture
 Tag-partitioned Storage
 Each disk is divided into M equal-sized partitions (except last). Objects are placed using tag affinity - preferentially stored in partitions matching their tag.
