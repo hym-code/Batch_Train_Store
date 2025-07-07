@@ -1,167 +1,37 @@
-本系统模拟了一个分布式存储环境，包含多个磁盘、对象存储、读写请求处理和空间管理功能。系统支持时间戳操作、对象删除、对象写入和读取请求处理。
+Distributed Storage System Simulator Design Overview
+This system simulates a distributed storage environment with optimized space management and I/O operations. Key design elements combine efficiency-focused data structures with intelligent allocation strategies:
+Core Architecture
+Tag-partitioned Storage
+Each disk is divided into M equal-sized partitions (except last). Objects are placed using tag affinity - preferentially stored in partitions matching their tag.
 
-核心设计要点
-1. 数据结构设计
-请求结构(Request_)
+Replica Management
+Every object maintains REP_NUM (default=3) replicas across different disks using load-aware selection.
 
-object_id: 请求访问的对象ID
+Space Allocation Engine
+Interval Tree Management
+Uses std::multimap<int, int> per partition to track free space:
 
-prev_id: 指向同一个对象的前一个请求ID（链表结构）
+Key: Free block size
 
-is_done: 请求完成状态标志
+Value: Starting position
 
-blocks_read: 位图记录已读取的块（最大支持5块）
+Supports O(log n) operations for allocation/deallocation
 
-对象结构(Object_)
+Two-tier Allocation Strategy
 
-replica[REP_NUM+1]: 对象副本所在的磁盘ID
+Continuous Allocation
+First-fit using lower_bound(size) in tag-matched partition
 
-unit[REP_NUM+1][MAX_OBJECT_SIZE+1]: 每个副本的块存储位置
+Scattered Allocation
+When continuous space unavailable, gather single blocks from multiple intervals.
 
-size: 对象大小（1-5块）
+Performance Optimizations
+Fixed-size arrays avoid dynamic allocation overhead
 
-tag: 对象所属标签分区
+Load-balanced writes prevent disk hotspots
 
-last_request_id: 最近请求ID
+Bulk operations minimize output flushing
 
-is_deleted: 删除标志
+O(1) position checks through precomputed tag boundaries
 
-磁盘管理
-
-disk: 二维数组记录每个存储单元的对象ID
-
-disk_head: 每个磁盘的当前磁头位置
-
-disk_last_token: 上一次操作的令牌消耗
-
-disk_load: 磁盘当前负载（存储块数）
-
-block_info: 三维数组记录块详细信息 [对象ID, 副本ID, 块索引]
-
-2. 空间管理策略
-标签分区
-
-每个磁盘分为M个等大分区（最后分区可能略大）
-
-tag_start_pos: 记录每个标签分区的起始位置
-
-tag_next_pos: 记录每个标签的下一个可用位置
-
-区间树管理
-
-使用std::multimap实现空闲空间管理
-
-键：空闲区间大小
-
-值：空闲区间起始位置
-
-支持操作：
-
-查找最优匹配区间
-
-分割区间
-
-合并相邻区间
-
-3. 核心算法
-空间分配算法
-
-连续空间分配
-
-优先在对象所属标签分区查找
-
-使用lower_bound查找最接近请求大小的区间
-
-分配后分割剩余空间
-
-分散空间分配
-
-当连续空间不足时使用
-
-从多个空闲区间各取一个单元
-
-优先使用同一标签分区空间
-
-空间回收算法
-
-检查释放空间是否连续
-
-尝试与相邻空闲区间合并
-
-支持跨标签分区的空间回收
-
-写入策略
-
-负载均衡：选择当前负载最低的磁盘
-
-标签亲和性：优先在对象标签对应的分区分配空间
-
-空间优化：连续空间优先，分散空间次之
-
-4. 读取策略（猛读策略）
-令牌管理
-
-每个磁盘每时间片有G个令牌
-
-读取成本动态计算：
-
-首次读取：64令牌
-
-后续读取：max(16, 上次消耗*0.8) 向上取整
-
-pass操作：1令牌
-
-处理流程
-
-从磁头当前位置开始扫描
-
-检查每个存储单元：
-
-有对象块且需要读取 → 执行读取操作
-
-其他情况 → 执行pass操作
-
-更新请求状态：
-
-标记已读取块
-
-检查请求是否完成
-
-磁头移动到下一位置
-
-5. 删除处理
-请求取消
-
-扫描对象的所有相关请求
-
-取消未完成的请求
-
-空间回收
-
-检查存储布局（连续/分散）
-
-将空间添加回空闲区间树
-
-更新磁盘负载
-
-6. 性能优化
-位图操作：使用位运算高效管理块读取状态
-
-固定大小数组：避免动态内存分配
-
-负载均衡：写入时选择负载最低的磁盘
-
-区间树合并：减少空间碎片
-
-请求链表：高效管理同一对象的多个请求
-
-关键特性
-标签亲和存储：对象优先存储在对应标签分区
-
-混合空间分配：支持连续和分散存储
-
-动态读取成本：根据读取模式优化令牌消耗
-
-高效空间管理：区间树实现O(log n)复杂度的空间操作
-
-请求级联处理：通过链表管理同一对象的多个请求# Batch_Train_Store
+This hybrid design balances space efficiency through interval tree management with I/O performance via adaptive read costing and head movement optimization, providing a high-fidelity distributed storage simulation environment.
